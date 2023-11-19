@@ -1,5 +1,4 @@
 import random
-import logging
 
 
 def unscramble(output):
