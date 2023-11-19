@@ -1,5 +1,4 @@
 import random
-import MT19937
 import logging
 
 
@@ -33,30 +32,45 @@ def scramble(input):
 
 
 if __name__ == '__main__':
-    MT19937.mt_seed(1)
+    random.seed()
+    output_numbers = []
     state_values = []
-    output_values = []
-    used_state_value = []
-    for a in range(1100):
-        MT19937.extract_number()
-    for a in range(1000):
-        used_state_value.append(MT19937.MT[MT19937.index % MT19937.n])
-        value_out = MT19937.extract_number()
-        output_values.append(value_out)
-        unscrambled_out = unscramble(value_out)
-        state_values.append(unscrambled_out)
-    #print(MT19937.cur_state)
-    print(output_values)
-    #print(used_state_value)
-    #print(state_values)
-    MT19937.MT = state_values[:624]
-    MT19937.index = 0
-    output_values_recreated = []
-    for a in range(1000):
-        output_values_recreated.append(MT19937.extract_number())
-    print(output_values_recreated)
-    for a in range (1000000):
-        b = MT19937.extract_number()
-        assert(b == unscramble(scramble(b)))
+    for a in range(1000000):
+        random.random()
+    for a in range(624):
+        output = random.getrandbits(32)
+        output_numbers.append(output)
+        state_values.append(unscramble(output))
+    print(output_numbers)
+    state_values.append(0)
+    random.setstate((3, tuple(state_values), None))
+    new_gen_output = []
+    for a in range(624):
+        new_gen_output.append(random.getrandbits(32))
+    print(new_gen_output)
+    assert(new_gen_output==output_numbers)
+
+
+# if __name__ == '__ain__':
+#     random.seed(1)
+#     a = random.getstate()
+#     print(a)
+#     random_number = random.getrandbits(32)
+#     print(random_number)
+#     before = random.getstate()
+#     print(before)
+#     test = before[1][0]
+#     print(scramble(test))
+#     print(unscramble(random_number))
+#     for b in range(100):
+#         random.getrandbits(32)
+#     after = random.getstate()
+#     print(after)
+#     count = 0
+#     for idx, c in enumerate(before[1]):
+#         if c != before[1][idx]:
+#             count += 1
+#     print(count)
+
 
 
