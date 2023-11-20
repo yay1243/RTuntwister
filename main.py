@@ -30,16 +30,29 @@ def scramble(input):
     return twisted
 
 
+def randint_emulator(states, range):
+    size = range.bit_length()
+    index = states[-1]
+    while (scramble(states[index]) >> (32-size)) >= range:
+        index += 1
+    number = scramble(states[index]) >> (32-size)
+    return number, index
+
+
 if __name__ == '__main__':
     random.seed()
     output_numbers = []
     state_values = []
+    further_output = []
+    new_gen_further_output = []
     for a in range(1000000):
         random.random()
     for a in range(624):
         output = random.getrandbits(32)
         output_numbers.append(output)
         state_values.append(unscramble(output))
+    for a in range(100):
+        further_output.append(random.getrandbits(32))
     print(output_numbers)
     state_values.append(0)
     random.setstate((3, tuple(state_values), None))
@@ -47,7 +60,10 @@ if __name__ == '__main__':
     for a in range(624):
         new_gen_output.append(random.getrandbits(32))
     print(new_gen_output)
-    assert(new_gen_output==output_numbers)
+    for a in range(100):
+        new_gen_further_output.append(random.getrandbits(32))
+    assert(new_gen_output == output_numbers)
+    assert(new_gen_further_output == further_output)
 
 
 # if __name__ == '__ain__':
