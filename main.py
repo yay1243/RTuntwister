@@ -1,7 +1,9 @@
 import random
+import RNG
+import z3
 
 
-def unscramble(output):
+def untemper(output):
     xor_last = output >> 18
     output_third = output ^ xor_last
     xor_third = (output_third << 15 & 0xefc60000)
@@ -21,7 +23,7 @@ def unscramble(output):
     return initial
 
 
-def scramble(input):
+def temper(input):
     # all funcs work as expected
     twisted = input ^ (input >> 11)
     twisted = twisted ^ ((twisted << 7) & 0x9d2c5680)
@@ -33,10 +35,22 @@ def scramble(input):
 def randint_emulator(states, range):
     size = range.bit_length()
     index = states[-1]
-    while (scramble(states[index]) >> (32-size)) >= range:
+    while (temper(states[index]) >> (32-size)) >= range:
         index += 1
-    number = scramble(states[index]) >> (32-size)
+    number = temper(states[index]) >> (32-size)
     return number, index
+
+
+def bf_attacker(outputs, out_size):
+    seed = 0
+    while seed < 2**32:
+        for idx, a in enumerate(outputs):
+            random.seed(seed)
+            if random.getrandbits(out_size) != outputs[a]:
+                seed += 1
+                break
+        return seed
+    return -1
 
 
 if __name__ == '__main__':
@@ -50,7 +64,7 @@ if __name__ == '__main__':
     for a in range(624):
         output = random.getrandbits(32)
         output_numbers.append(output)
-        state_values.append(unscramble(output))
+        state_values.append(untemper(output))
     for a in range(100):
         further_output.append(random.getrandbits(32))
     print(output_numbers)
@@ -64,28 +78,15 @@ if __name__ == '__main__':
         new_gen_further_output.append(random.getrandbits(32))
     assert(new_gen_output == output_numbers)
     assert(new_gen_further_output == further_output)
+    print(further_output[:5])
+    print(new_gen_further_output[:5])
 
 
-# if __name__ == '__ain__':
-#     random.seed(1)
-#     a = random.getstate()
-#     print(a)
-#     random_number = random.getrandbits(32)
-#     print(random_number)
-#     before = random.getstate()
-#     print(before)
-#     test = before[1][0]
-#     print(scramble(test))
-#     print(unscramble(random_number))
-#     for b in range(100):
-#         random.getrandbits(32)
-#     after = random.getstate()
-#     print(after)
-#     count = 0
-#     for idx, c in enumerate(before[1]):
-#         if c != before[1][idx]:
-#             count += 1
-#     print(count)
-
-
+if __name__ == '__min__':
+    random.seed(1)
+    a = random.getstate()
+    print(a)
+    random.seed(2)
+    a = random.getstate()
+    print(a)
 
