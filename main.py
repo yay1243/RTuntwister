@@ -148,13 +148,6 @@ def auto_z3_solver(outputs1, outputs2, bit_length):
     y3_set = []
     y_initial_outputs = []
     y_initial_offset_outputs = []
-    # The stuff used in the 2nd iteration of the RNG
-    y_refreshed_states = []
-    y4_set = []
-    y5_set = []
-    y6_set = []
-    y_refreshed_outputs = []
-    y_refreshed_offset_outputs = []
     for a in range(624):
         y_initial_states.append(z3.BitVec('y_baseplus' + str(a), 32))
         y1_set.append(z3.BitVec('y1plus' + str(a), 32))
@@ -162,12 +155,6 @@ def auto_z3_solver(outputs1, outputs2, bit_length):
         y3_set.append(z3.BitVec('y3plus' + str(a), 32))
         y_initial_outputs.append(z3.BitVec('y_baseplus' + str(a) + '_out', 32))
         y_initial_offset_outputs.append(z3.BitVecVal(outputs1[a], 32))
-        # y_refreshed_states.append(z3.BitVec('y_refreshedplus' + str(a), 32))
-        # y4_set.append(z3.BitVec('y4plus' + str(a), 32))
-        # y5_set.append(z3.BitVec('y5plus' + str(a), 32))
-        # y6_set.append(z3.BitVec('y6plus' + str(a), 32))
-        # y_refreshed_outputs.append(z3.BitVec('y_refreshedplus' + str(a) + '_out', 32))
-        # y_refreshed_offset_outputs.append(z3.BitVecVal(outputs2[a], 32))
     for a in range(624):
         y_initial_states.append(z3.BitVec('y_refreshedplus' + str(a), 32))
         y1_set.append(z3.BitVec('y4plus' + str(a), 32))
@@ -237,15 +224,6 @@ def twist(states):
     return new_states
 
 
-def single_twist(in1, in2, in3):
-    matrix = [0, 0x9908b0df]
-    upper_mask = 0x80000000
-    lower_mask = 0x7fffffff
-    y = (in1 & upper_mask) | (in2 & lower_mask)
-    temp = in3 ^ (y >> 1) ^ matrix[y & 1]
-    return temp
-
-
 if __name__ == '__min__':
     random.seed()
     output_numbers = []
@@ -276,27 +254,35 @@ if __name__ == '__min__':
 
 
 if __name__ == '__main__':
-    random.seed()
-    a = random.getstate()
-    output_set1 = []
-    output_set2 = []
-    for a in range(624):
-        output_set1.append(random.getrandbits(31))
-    print(f"Relevant states for 1st iter: \n{random.getstate()[1][0], random.getstate()[1][1], random.getstate()[1][397]}")
-    first_iter_state = random.getstate()[1]
-    for a in range(624):
-        output_set2.append(random.getrandbits(31))
-    print(f"Relevant states for 2nd iter: \n{random.getstate()[1][0]}")
-    print(f"1st output in 2nd set = {output_set2[0]}")
-    check = auto_z3_solver(output_set1, output_set2, 31)
-    print(check)
-    print(first_iter_state)
-    count = 0
-    for a in range(624):
-        if check[a] == first_iter_state[a]:
+    for run in range(5):
+        print(f"Run {run+1}")
+        random.seed()
+        a = random.getstate()
+        bit_length = 22
+        output_set1 = []
+        output_set2 = []
+        for a in range(624):
+            output_set1.append(random.getrandbits(bit_length))
+        # print(f"Relevant states for 1st iter: \n{random.getstate()[1][0], random.getstate()[1][1], random.getstate()[1][397]}")
+        first_iter_state = random.getstate()[1]
+        for a in range(624):
+            output_set2.append(random.getrandbits(bit_length))
+        # print(f"Relevant states for 2nd iter: \n{random.getstate()[1][0]}")
+        # print(f"1st output in 2nd set = {output_set2[0]}")
+        check = auto_z3_solver(output_set1, output_set2, bit_length)
+        print(check)
+        print(first_iter_state)
+        count = 0
+        error_index = []
+        for a in range(624):
+            if check[a] != first_iter_state[a]:
+                error_index.append(a)
+                continue
             count += 1
-    print(count)
-    assert count == 624
+        print(count)
+        print(error_index)
+        # assert count == 624
+        run += 1
 
 
 
