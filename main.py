@@ -1,5 +1,4 @@
 import random
-import time
 import z3
 
 
@@ -141,12 +140,15 @@ def auto_z3_solver(outputs1, outputs2, bit_length):
     upper_mask = 0x80000000
     lower_mask = 0x7fffffff
     matrix = [0, 0x9908b0df]
+    # The stuff used for the 1st iteration of the RNG (0 - 623)
+    # The stuff used for the 2nd iteration of the RNG (624 - 1247)
     y_initial_states = []
     y1_set = []
     y2_set = []
     y3_set = []
     y_initial_outputs = []
     y_initial_offset_outputs = []
+    # The stuff used in the 2nd iteration of the RNG
     y_refreshed_states = []
     y4_set = []
     y5_set = []
@@ -160,36 +162,40 @@ def auto_z3_solver(outputs1, outputs2, bit_length):
         y3_set.append(z3.BitVec('y3plus' + str(a), 32))
         y_initial_outputs.append(z3.BitVec('y_baseplus' + str(a) + '_out', 32))
         y_initial_offset_outputs.append(z3.BitVecVal(outputs1[a], 32))
-        y_refreshed_states.append(z3.BitVec('y_refreshedplus' + str(a), 32))
-        y4_set.append(z3.BitVec('y4plus' + str(a), 32))
-        y5_set.append(z3.BitVec('y5plus' + str(a), 32))
-        y6_set.append(z3.BitVec('y6plus' + str(a), 32))
-        y_refreshed_outputs.append(z3.BitVec('y_refreshedplus' + str(a) + '_out', 32))
-        y_refreshed_offset_outputs.append(z3.BitVecVal(outputs2[a], 32))
+        # y_refreshed_states.append(z3.BitVec('y_refreshedplus' + str(a), 32))
+        # y4_set.append(z3.BitVec('y4plus' + str(a), 32))
+        # y5_set.append(z3.BitVec('y5plus' + str(a), 32))
+        # y6_set.append(z3.BitVec('y6plus' + str(a), 32))
+        # y_refreshed_outputs.append(z3.BitVec('y_refreshedplus' + str(a) + '_out', 32))
+        # y_refreshed_offset_outputs.append(z3.BitVecVal(outputs2[a], 32))
+    for a in range(624):
+        y_initial_states.append(z3.BitVec('y_refreshedplus' + str(a), 32))
+        y1_set.append(z3.BitVec('y4plus' + str(a), 32))
+        y2_set.append(z3.BitVec('y5plus' + str(a), 32))
+        y3_set.append(z3.BitVec('y6plus' + str(a), 32))
+        y_initial_outputs.append(z3.BitVec('y_refreshedplus' + str(a) + '_out', 32))
+        y_initial_offset_outputs.append(z3.BitVecVal(outputs2[a], 32))
+    for a in range(1248):
         equations = [
             y1_set[a] == y_initial_states[a] ^ (z3.LShR(y_initial_states[a], 11)),
             y2_set[a] == y1_set[a] ^ ((y1_set[a] << 7) & 0x9d2c5680),
             y3_set[a] == y2_set[a] ^ ((y2_set[a] << 15) & 0xefc60000),
             y_initial_outputs[a] == y3_set[a] ^ (z3.LShR(y3_set[a], 18)),
             y_initial_offset_outputs[a] == z3.LShR(y_initial_outputs[a], offset),
-            y4_set[a] == y_refreshed_states[a] ^ (z3.LShR(y_refreshed_states[a], 11)),
-            y5_set[a] == y4_set[a] ^ ((y4_set[a] << 7) & 0x9d2c5680),
-            y6_set[a] == y5_set[a] ^ ((y5_set[a] << 15) & 0xefc60000),
-            y_refreshed_outputs[a] == y6_set[a] ^ (z3.LShR(y6_set[a], 18)),
-            y_refreshed_offset_outputs[a] == z3.LShR(y_refreshed_outputs[a], offset)
         ]
         solver.add(equations)
-    for a in range(220):
-        equation = [y_refreshed_states[a] == z3.If(((y_initial_states[a] & upper_mask) | (y_initial_states[(a+1) % 624]
+    for a in range(624):
+        equation = [
+            y_initial_states[a + 624] == z3.If(((y_initial_states[a] & upper_mask) | (y_initial_states[(a+1)]
                                                                                            & lower_mask)) << 31 == 0,
                                    # If Thingy last bit == 0, states[(idx + 397) % 624] ^ (y >> 1) ^ matrix[0]
-                                   y_initial_states[(a + 397) % 624] ^
+                                   y_initial_states[(a + 397)] ^
                                    z3.LShR(((y_initial_states[a] & upper_mask) |
-                                            (y_initial_states[(a+1) % 624] & lower_mask)), 1),
+                                            (y_initial_states[(a+1)] & lower_mask)), 1),
                                    # If Thingy last bit != 1, states[(idx + 397) % 624] ^ (y >> 1) ^ matrix[1]
-                                   y_initial_states[(a + 397) % 624]
+                                   y_initial_states[(a + 397)]
                                    ^ z3.LShR(((y_initial_states[a] & upper_mask) |
-                                              (y_initial_states[(a+1) % 624] & lower_mask)), 1)
+                                              (y_initial_states[(a+1)] & lower_mask)), 1)
                                    ^ 0x9908b0df
                                    )
         ]
@@ -270,7 +276,7 @@ if __name__ == '__min__':
 
 
 if __name__ == '__main__':
-    random.seed(2)
+    random.seed()
     a = random.getstate()
     cur_states = list(a[1])
     cur_states[624] = 0
@@ -280,13 +286,20 @@ if __name__ == '__main__':
     for a in range(624):
         output_set1.append(random.getrandbits(31))
     print(f"Relevant states for 1st iter: \n{random.getstate()[1][0], random.getstate()[1][1], random.getstate()[1][397]}")
-    a = random.getstate()[1]
+    first_iter_state = random.getstate()[1]
     for a in range(624):
         output_set2.append(random.getrandbits(31))
     print(f"Relevant states for 2nd iter: \n{random.getstate()[1][0]}")
     print(f"1st output in 2nd set = {output_set2[0]}")
     check = auto_z3_solver(output_set1, output_set2, 31)
-    assert(a == check)
+    print(check)
+    print(first_iter_state)
+    count = 0
+    for a in range(624):
+        if check[a] == first_iter_state[a]:
+            count += 1
+    print(count)
+    assert count == 624
 
 
 
