@@ -278,9 +278,6 @@ if __name__ == '__min__':
 if __name__ == '__main__':
     random.seed()
     a = random.getstate()
-    cur_states = list(a[1])
-    cur_states[624] = 0
-    random.setstate((3, tuple(cur_states), None))
     output_set1 = []
     output_set2 = []
     for a in range(624):
