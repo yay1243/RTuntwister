@@ -133,8 +133,9 @@ def z3_solver(outputs1, outputs2, bit_length):
     return solver.model()[y_refreshed_state].as_long()
 
 
-def auto_z3_solver(outputs1, outputs2, bit_length):
+def auto_z3_solver(outputs, regis_multiple, bit_length):
     offset = 32 - bit_length
+    length = regis_multiple * 624
     solver = z3.Solver()
     solver.set("timeout", 500000000)
     upper_mask = 0x80000000
@@ -148,21 +149,14 @@ def auto_z3_solver(outputs1, outputs2, bit_length):
     y3_set = []
     y_initial_outputs = []
     y_initial_offset_outputs = []
-    for a in range(624):
+    for a in range(length):
         y_initial_states.append(z3.BitVec('y_baseplus' + str(a), 32))
         y1_set.append(z3.BitVec('y1plus' + str(a), 32))
         y2_set.append(z3.BitVec('y2plus' + str(a), 32))
         y3_set.append(z3.BitVec('y3plus' + str(a), 32))
         y_initial_outputs.append(z3.BitVec('y_baseplus' + str(a) + '_out', 32))
-        y_initial_offset_outputs.append(z3.BitVecVal(outputs1[a], 32))
-    for a in range(624):
-        y_initial_states.append(z3.BitVec('y_refreshedplus' + str(a), 32))
-        y1_set.append(z3.BitVec('y4plus' + str(a), 32))
-        y2_set.append(z3.BitVec('y5plus' + str(a), 32))
-        y3_set.append(z3.BitVec('y6plus' + str(a), 32))
-        y_initial_outputs.append(z3.BitVec('y_refreshedplus' + str(a) + '_out', 32))
-        y_initial_offset_outputs.append(z3.BitVecVal(outputs2[a], 32))
-    for a in range(1248):
+        y_initial_offset_outputs.append(z3.BitVecVal(outputs[a], 32))
+    for a in range(length):
         equations = [
             y1_set[a] == y_initial_states[a] ^ (z3.LShR(y_initial_states[a], 11)),
             y2_set[a] == y1_set[a] ^ ((y1_set[a] << 7) & 0x9d2c5680),
@@ -171,7 +165,7 @@ def auto_z3_solver(outputs1, outputs2, bit_length):
             y_initial_offset_outputs[a] == z3.LShR(y_initial_outputs[a], offset),
         ]
         solver.add(equations)
-    for a in range(624):
+    for a in range(length - 624):
         equation = [
             y_initial_states[a + 624] == z3.If(((y_initial_states[a] & upper_mask) | (y_initial_states[(a+1)]
                                                                                            & lower_mask)) << 31 == 0,
@@ -201,15 +195,6 @@ def temper(input):
     twisted = twisted ^ ((twisted << 15) & 0xefc60000)
     twisted = twisted ^ (twisted >> 18)
     return twisted
-
-
-def randint_emulator(states, range):
-    size = range.bit_length()
-    index = states[-1]
-    while (temper(states[index]) >> (32-size)) >= range:
-        index += 1
-    number = temper(states[index]) >> (32-size)
-    return number, index
 
 
 def twist(states):
@@ -254,35 +239,38 @@ if __name__ == '__min__':
 
 
 if __name__ == '__main__':
-    for run in range(5):
+    failed_runs = 0
+    for run in range(20):
         print(f"Run {run+1}")
         random.seed()
         a = random.getstate()
-        bit_length = 22
+        bit_length = 31
         output_set1 = []
-        output_set2 = []
         for a in range(624):
             output_set1.append(random.getrandbits(bit_length))
         # print(f"Relevant states for 1st iter: \n{random.getstate()[1][0], random.getstate()[1][1], random.getstate()[1][397]}")
         first_iter_state = random.getstate()[1]
         for a in range(624):
-            output_set2.append(random.getrandbits(bit_length))
+            output_set1.append(random.getrandbits(bit_length))
+        for a in range(200000):
+            output_set1.append(random.getrandbits(bit_length))
         # print(f"Relevant states for 2nd iter: \n{random.getstate()[1][0]}")
         # print(f"1st output in 2nd set = {output_set2[0]}")
-        check = auto_z3_solver(output_set1, output_set2, bit_length)
+        check = auto_z3_solver(output_set1, 2, bit_length)
         print(check)
         print(first_iter_state)
-        count = 0
-        error_index = []
-        for a in range(624):
-            if check[a] != first_iter_state[a]:
-                error_index.append(a)
-                continue
-            count += 1
-        print(count)
-        print(error_index)
+        # Always the 1st state number is not right, but it does exactly as the solver wants, so the following outputs
+        # are still correct, even tho 1st state number is wrong
+        check.append(624)
+        random.setstate((3, tuple(check), None))
+        for a in range(200000):
+            if random.getrandbits(bit_length) != output_set1[a + 624]:
+                failed_runs += 1
+                print('f')
+                break
         # assert count == 624
         run += 1
+    print(failed_runs)
 
 
 
